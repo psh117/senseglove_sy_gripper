@@ -27,14 +27,17 @@ goal = FollowJointTrajectoryGoal()
 # hap_cmd.joint_names = 
 
 point = JointTrajectoryPoint()
-point.positions = [100, 0, 0, 0, 0, 0, 0, 0, 0, 0]  # what you will!
-point.time_from_start = rospy.Duration.from_sec(0.001)
+break_val = 0
+vib_val = 0
+point.positions = [break_val, break_val, break_val, break_val, break_val, vib_val, vib_val, vib_val, vib_val, vib_val]  # what you will!
+point.time_from_start = rospy.Duration.from_sec(0.1)
 goal.trajectory.joint_names = ['thumb_brake', 'index_brake', 'middle_brake', 'ring_brake', 'pinky_brake', 
                                'thumb_cmc', 'index_mcp', 'middle_mcp', 'ring_mcp', 'pinky_mcp']
 goal.trajectory.points.append(point)
 rate = rospy.Rate(1)
 while rospy.is_shutdown() is False:
-    goal.header.stamp = rospy.Time.now()
+    goal.trajectory.header.stamp = rospy.Time.now()
+    # goal.trajectory.header.stamp.nsecs -= 25000
     client.send_goal(goal)
     client.wait_for_result()
     rate.sleep()
