@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(sensorglove_sy_gripper)
+project(senseglove_sy_gripper)
 
 find_package(catkin REQUIRED)
 

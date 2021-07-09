@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>sensorglove_sy_gripper</name>
+  <name>senseglove_sy_gripper</name>
   <version>0.0.0</version>
   <description>The sensorglove_sy_gripper package</description>
 
