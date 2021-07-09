@@ -14,7 +14,7 @@ sudo su
 source /opt/ros/melodic/setup.bash
 source devel/setup.bash
 
-rosrun sensorglove_sy_gripper glove_calibration.py
+rosrun sensorglove_sy_gripper glove_gripper_caliration.py
 ```
 
 # run

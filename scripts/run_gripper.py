@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from __future__ import print_function, division
 import rospy
 import os
@@ -49,14 +50,18 @@ desired_pos = [0,0,0,0]
 
 class HandInterface:
     def __init__(self):
-        self.__calibration()
-        self.__init_dxl()
         self.past_glove_joints = np.zeros(4)
         self.current_dxl_joints = np.zeros(4)
+        self.calib_poses = {}
         self.calib_types = ['stretch',
+                            'finger1_finger2_flexion',
+                            'thumb_flexion',
                             'thumb_finger1',
                             'thumb_finger2',
                             'lateral_pinch']
+
+        self.__calibration()
+        self.__init_dxl()
         
         self.tau = 0.6
 
@@ -95,21 +100,25 @@ class HandInterface:
         self.packetHandler.write1ByteTxRx(self.portHandler, DXL_ID[2], ADDR_XL330_TORQUE_ENABLE , TORQUE_ENABLE)
         self.packetHandler.write1ByteTxRx(self.portHandler, DXL_ID[3], ADDR_XL330_TORQUE_ENABLE , TORQUE_ENABLE)
         
-    def __calibration(self, name):
+    def __calibration(self):
         for calib_type in self.calib_types:
             self.calib_poses[calib_type] = rospy.get_param('/dyros_glove/calibration/' + calib_type)
 
         # TODO: 
-        # Use self.calib_pose['stretch'], : numpy.array(), len() = 4
-        #     self.calib_pose['thumb_finger2'], : numpy.array(), len() = 4
-        #     self.calib_pose['thumb_finger3'], : numpy.array(), len() = 4
-        #     self.calib_pose['lateral_pinch'] : numpy.array(), len() = 4
+        # Use self.calib_poses['stretch'], : numpy.array(), len() = 4
+        #     self.calib_poses['thumb_finger2'], : numpy.array(), len() = 4
+        #     self.calib_poses['thumb_finger3'], : numpy.array(), len() = 4
+        #     self.calib_poses['lateral_pinch'] : numpy.array(), len() = 4
 
         # example ############
-        str_pos = self.calib_pose['stretch']
-        tf2_pos = self.calib_pose['thumb_finger1']
-        tf3_pos = self.calib_pose['thumb_finger2']
-        lap_pos = self.calib_pose['lateral_pinch']
+        str_pos = self.calib_poses['stretch']
+        f12_pos = self.calib_poses['finger1_finger2_flexion']
+        tfe_pos = self.calib_poses['thumb_flexion']
+        tf1_pos = self.calib_poses['thumb_finger1']
+        tf2_pos = self.calib_poses['thumb_finger2']
+        lap_pos = self.calib_poses['lateral_pinch'] 
+        
+        #0:Thumb AA, 1:Thumb MCP, 2:Index MCP, 3:Middle MCP (16:Thumb AA, 18:Thumb MCP, 2:Index MCP, 6:Middle MCP)
 
         v1 = str_pos[0] + str_pos[1]
         #######################
@@ -123,28 +132,33 @@ class HandInterface:
         ps = np.array([[1689, init_pos[0], 2700], [init_pos[1], 1650 - init_pos[1] , 2400 - init_pos[1]], [init_pos[2], 1800 - init_pos[2], 2400 - init_pos[2]], [init_pos[3], 1800 - init_pos[3], 2400 - init_pos[3]]])
         # Thumb: Lateral Pinch, T-1, T-1	Thumb: Init, pinch, full flexion		Index: Init, pinch, full flexion	    Middle: Init, pinch, full flexion
 
+
+
+
         a0 = [0, 0, 0, 0]
 
-        a0[1] = 0.8  # Minus!!!
-        a0[2] = -0.24
-        a0[3] = -0.24
+        # a0 : full extension -> Using str_pos for all three fingers
+        a0[1] = -str_pos[1]  # Minus!!!
+        a0[2] = str_pos[2]
+        a0[3] = str_pos[3]
 
         #Flexion Activation at pinch - Thumb Index Middle
-        a = [0, 0, 0, 0]			# a = 2 * PIP_FE  + 1 * MCP_FE
+        a = [0, 0, 0, 0]			
         a[0] = 0					#Not used
-        #a[1] = (2 * 0.00) + 0.15			#Thumb
-        #a[2] = (2 * 0.51) + 0.20				#Index
-        #a[3] = (2 * 0.25) + 0.25			#middle
-        a[1] = 1.5   # MINUS Value!!!!
-        a[2] = 0.383
-        a[3] = 0.65
+
+        #Using tf1_pos, tf2_pos 
+        a[1] = -(tf1_pos[1]+tf2_pos[1])/2   # MINUS Value!!!! 
+        a[2] = tf1_pos[2]
+        a[3] = tf2_pos[3]
+
+
 
         a_max = [0, 0, 0, 0]
-        a_max[1] = 2.06 - a0[1] # Minus!!!
-        a_max[2] = 1.01 - a0[2]
-        a_max[3] = 1.32 - a0[3]
+        a_max[1] = -tfe_pos[1] - a0[1] # Minus!!!
+        a_max[2] = f12_pos[2] - a0[2]
+        a_max[3] = f12_pos[3] - a0[3]
 
-        a_thumbAA = [-1.5, -0.94, -0.85]
+        a_thumbAA = [lap_pos[0], tf1_pos[0], tf2_pos[0]]
         #a_thumbAA = [0.22, 0.71, 0.76]  #AA activations of Lateral Pinch, T-1 and T-2
         #a_thumbAA = [0.2, 0.6, 0.69]
 
@@ -182,7 +196,11 @@ class HandInterface:
         f0 = np.dot(M_AA_inv, q)
 
         self.a0 = a0
+        self.a = a
+        self.a_max = a_max
         self.f0 = f0
+        self.f1 = f1
+        self.f2 = f2
         self.f3 = f3
         #f0[0,0]
         #f0[0,1]
@@ -200,6 +218,9 @@ class HandInterface:
         q = self.filtered_glove_joint
 
         f0 = self.f0
+        f1 = self.f1
+        f2 = self.f2
+        f3 = self.f3
         a0 = self.a0
 
         desired_pos[0] = 1689 + int(f0[0,0]*q[0]*q[0] + f0[1,0]*q[0] + f0[2,0])
@@ -228,7 +249,7 @@ class HandInterface:
     def read_joint_position(self) :
         dxl_comm_result = self.groupSyncRead.txRxPacket()
         for idx in DXL_ID :
-            self.__current_dxl_joints[idx-1] = self.groupSyncRead.getData(idx, ADDR_XL330_PRESENT_POSITION, LEN_PRESENT_POSITION)
+            self.current_dxl_joints[idx-1] = self.groupSyncRead.getData(idx, ADDR_XL330_PRESENT_POSITION, LEN_PRESENT_POSITION)
             #print('Joint pos read')
         
         # print('current pos ' , pos)

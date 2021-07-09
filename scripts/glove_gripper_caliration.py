@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from __future__ import print_function, division
 import rospy
 import os, sys
@@ -17,6 +18,8 @@ class GloveCalibration:
         self.tau = 0.6
 
         self.calib_types = ['stretch',
+                            'finger1_finger2_flexion',
+                            'thumb_flexion',
                             'thumb_finger1',
                             'thumb_finger2',
                             'lateral_pinch']
