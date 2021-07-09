@@ -1,12 +1,7 @@
 #!/usr/bin/env python
 from __future__ import print_function, division
 import rospy
-import os, sys
-import copy
 import numpy as np
-import keyboard
-from std_msgs.msg import Header
-from sensor_msgs.msg import JointState
 import actionlib
 from control_msgs.msg import FollowJointTrajectoryGoal, FollowJointTrajectoryAction
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
