@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 from __future__ import print_function, division
 import rospy
-import os
-import sys
-import copy
+import actionlib
 import dynamixel_sdk as dxl                  # Uses DYNAMIXEL SDK library
 import numpy as np
 from sensor_msgs.msg import JointState
+from control_msgs.msg import FollowJointTrajectoryGoal, FollowJointTrajectoryAction
+from trajectory_msgs.msg import JointTrajectoryPoint
 
 # Control table address
 ADDR_XL330_TORQUE_ENABLE       	= 64                          # Control table address is different in Dynamixel model
@@ -66,6 +66,30 @@ class HandInterface:
         self.tau = 0.6
 
         rospy.Subscriber("/senseglove/0/rh/joint_states", JointState, self.callback, queue_size=1)
+        self.feedback_client = actionlib.SimpleActionClient('/senseglove/0/rh/controller/trajectory/follow_joint_trajectory', FollowJointTrajectoryAction)
+        self.feedback_client.wait_for_server()
+        self.feedback_goal = FollowJointTrajectoryGoal()
+
+        point = JointTrajectoryPoint()
+        point.positions = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        point.time_from_start = rospy.Duration.from_sec(0.03)
+        self.feedback_goal.trajectory.points.append(point)
+
+        self.full_joint_names = ['thumb_brake', 'index_brake', 'middle_brake', 'ring_brake', 'pinky_brake', 
+                                    'thumb_cmc', 'index_mcp', 'middle_mcp', 'ring_mcp', 'pinky_mcp'] 
+
+        self.set_glove_feedback(self.full_joint_names, [0] * 10)
+
+    def set_glove_feedback(self, names, vals):
+        self.feedback_goal.trajectory.joint_names = names
+        self.feedback_goal.trajectory.points[0].positions = vals
+        self.feedback_goal.trajectory.header.stamp = rospy.Time.now()
+        self.feedback_client.send_goal(self.feedback_goal)
+        self.feedback_client.wait_for_result()
+
+        # how to use 
+        # self.set_glove_feedback(['thumb_cmc'], [40]) # vibration 40 %
+        # self.set_glove_feedback(['thumb_brake', 'thumb_cmc'], [20, 40]) # break 20 %, vibration 40 %
     
     def __init_dxl(self):
         self.portHandler = dxl.PortHandler(DEVICENAME)
