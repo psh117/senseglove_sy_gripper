@@ -5,6 +5,7 @@ import actionlib
 import dynamixel_sdk as dxl                  # Uses DYNAMIXEL SDK library
 import numpy as np
 from sensor_msgs.msg import JointState
+from std_msgs.msg import Float64MultiArray
 from control_msgs.msg import FollowJointTrajectoryGoal, FollowJointTrajectoryAction
 from trajectory_msgs.msg import JointTrajectoryPoint
 
@@ -65,6 +66,10 @@ class HandInterface:
         
         self.tau = 0.6
 
+
+        self.full_joint_names = ['thumb_brake', 'index_brake', 'middle_brake', 'ring_brake', 'pinky_brake', 
+                                    'thumb_cmc', 'index_mcp', 'middle_mcp', 'ring_mcp', 'pinky_mcp']
+        self.vib_names = ['thumb_cmc', 'index_mcp', 'middle_mcp', 'ring_mcp', 'pinky_mcp']
         rospy.Subscriber("/senseglove/0/rh/joint_states", JointState, self.callback, queue_size=1)
         self.feedback_client = actionlib.SimpleActionClient('/senseglove/0/rh/controller/trajectory/follow_joint_trajectory', FollowJointTrajectoryAction)
         self.feedback_client.wait_for_server()
@@ -72,13 +77,11 @@ class HandInterface:
 
         point = JointTrajectoryPoint()
         point.positions = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        point.time_from_start = rospy.Duration.from_sec(0.03)
+        point.time_from_start = rospy.Duration.from_sec(0.3)
         self.feedback_goal.trajectory.points.append(point)
 
-        self.full_joint_names = ['thumb_brake', 'index_brake', 'middle_brake', 'ring_brake', 'pinky_brake', 
-                                    'thumb_cmc', 'index_mcp', 'middle_mcp', 'ring_mcp', 'pinky_mcp'] 
-
         self.set_glove_feedback(self.full_joint_names, [0] * 10)
+        rospy.Subscriber("/tocabi/handforce", Float64MultiArray, self.callback1, queue_size=1)
 
     def set_glove_feedback(self, names, vals):
         self.feedback_goal.trajectory.joint_names = names
@@ -259,7 +262,11 @@ class HandInterface:
             if desired_pos[i] < 600 :
                 desired_pos[i] = 600
 
-        print('desired_position', desired_pos)
+        # print('desired_position', desired_pos)
+        #print('current_position', self.current_dxl_joints)
+
+        ###############################
+
 
         self.groupSyncWrite.clearParam()
         for i in range(4):
@@ -268,7 +275,17 @@ class HandInterface:
 
         dxl_comm_result = self.groupSyncWrite.txPacket()
         self.past_glove_joints = self.filtered_glove_joint
-    
+
+    def callback1(self, data):
+        sensor_data = data.data
+        vib_data = []
+        for d in sensor_data:
+            vib_data.append( min (d * 40, 100))
+            if vib_data[-1] < 50.0:
+                vib_data[-1] = 0
+        
+        # print('vib_data :' , vib_data)
+        self.set_glove_feedback(self.full_joint_names[0:3] + self.vib_names[0:3], [0,0,0] + vib_data[0:3])
 
     def read_joint_position(self) :
         dxl_comm_result = self.groupSyncRead.txRxPacket()
