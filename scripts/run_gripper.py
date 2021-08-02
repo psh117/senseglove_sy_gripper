@@ -17,6 +17,7 @@ ADDR_XL330_GOAL_POSITION       	= 116
 
 ADDR_XL330_PRESENT_POSITION	= 132
 ADDR_XL330_OPERATING_MODE	= 11
+ADDR_XL330_CURRENT_LIMIT	= 38
 
 ADDR_XL330_GOAL_CURRENT		= 102
 
@@ -114,18 +115,16 @@ class HandInterface:
         if self.portHandler.setBaudRate(BAUDRATE): print("Succeeded to change the baudrate")
         else: print("Failed to change the baudrate")
 
+        for i in range(4):
+            self.packetHandler.write1ByteTxRx(self.portHandler, DXL_ID[i], ADDR_XL330_TORQUE_ENABLE , TORQUE_DISABLE)
 
-        # Position mode
-        self.packetHandler.write1ByteTxRx(self.portHandler, DXL_ID[0], ADDR_XL330_OPERATING_MODE , POSITION_CONTROL_MODE) 
-        self.packetHandler.write1ByteTxRx(self.portHandler, DXL_ID[1], ADDR_XL330_OPERATING_MODE , POSITION_CONTROL_MODE) 
-        self.packetHandler.write1ByteTxRx(self.portHandler, DXL_ID[2], ADDR_XL330_OPERATING_MODE , POSITION_CONTROL_MODE) 
-        self.packetHandler.write1ByteTxRx(self.portHandler, DXL_ID[3], ADDR_XL330_OPERATING_MODE , POSITION_CONTROL_MODE) 
+        for i in range(4):
+            self.packetHandler.write1ByteTxRx(self.portHandler, DXL_ID[i], ADDR_XL330_OPERATING_MODE , CURRENT_POSITION_CONTROL_MODE) 
+            self.packetHandler.write2ByteTxRx(self.portHandler, DXL_ID[i], ADDR_XL330_CURRENT_LIMIT , 900) 
 
         # Torque on
-        self.packetHandler.write1ByteTxRx(self.portHandler, DXL_ID[0], ADDR_XL330_TORQUE_ENABLE , TORQUE_ENABLE)
-        self.packetHandler.write1ByteTxRx(self.portHandler, DXL_ID[1], ADDR_XL330_TORQUE_ENABLE , TORQUE_ENABLE)
-        self.packetHandler.write1ByteTxRx(self.portHandler, DXL_ID[2], ADDR_XL330_TORQUE_ENABLE , TORQUE_ENABLE)
-        self.packetHandler.write1ByteTxRx(self.portHandler, DXL_ID[3], ADDR_XL330_TORQUE_ENABLE , TORQUE_ENABLE)
+        for i in range(4):
+            self.packetHandler.write1ByteTxRx(self.portHandler, DXL_ID[i], ADDR_XL330_TORQUE_ENABLE , TORQUE_ENABLE)
         
     def __calibration(self):
         for calib_type in self.calib_types:
@@ -299,3 +298,7 @@ if __name__== '__main__':
     rospy.init_node('gripper_test')
     hi = HandInterface()
     rospy.spin()
+    
+    # shutdown
+    for i in range(4):
+        hi.packetHandler.write1ByteTxRx(hi.portHandler, DXL_ID[i], ADDR_XL330_TORQUE_ENABLE , TORQUE_DISABLE)
