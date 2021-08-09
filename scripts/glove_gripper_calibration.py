@@ -28,10 +28,10 @@ class GloveCalibration:
                             'thumb_finger2',
                             'lateral_pinch']
 
-        rospy.Subscriber("/senseglove/0/lh/joint_states", JointState, partial(self.joint_callbac,'left'), queue_size=1)
-        rospy.Subscriber("/senseglove/0/rh/joint_states", JointState, partial(self.joint_callbac,'right'), queue_size=1)
+        rospy.Subscriber("/senseglove/0/lh/joint_states", JointState, partial(self.joint_callback,'left'), queue_size=1)
+        rospy.Subscriber("/senseglove/0/rh/joint_states", JointState, partial(self.joint_callback,'right'), queue_size=1)
 
-    def joint_callback(self, data, location):
+    def joint_callback(self, location, data):
         input_pose = data.position
         self.current_glove_joint[location] = np.array([input_pose[16], input_pose[18], input_pose[2], input_pose[6]])
         self.filtered_glove_joint[location] = self.current_glove_joint[location] * self.tau + self.past_glove_joints[location] * (1 - self.tau)
@@ -49,7 +49,9 @@ class GloveCalibration:
         print('-------- Calibration starts [{0}] --------'.format(location))
         for calib_type in self.calib_types:
             print ('calibrating... {0} - {1}'.format(location, calib_type))
-            input('Press enter to start this calibration')
+            print('Press enter to start this calibration')
+            # a = input()
+            os.system('pause')
 
             self.joint_captures[location] = []
             self.capture_trigger[location] = True
@@ -58,11 +60,11 @@ class GloveCalibration:
             
             # wait for capturing
             while rospy.is_shutdown() is False:
-                if self.capture_trigger is False:
+                if self.capture_trigger[location] is False:
                     break
             
             sum_joints = np.zeros(4)    
-            for joints in self.joint_captures:
+            for joints in self.joint_captures[location]:
                 sum_joints += joints
 
             mean_joints = sum_joints / float(self.num_captures)
