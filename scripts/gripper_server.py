@@ -143,7 +143,7 @@ class HandInterface:
         
     def __calibration(self, location):
         for calib_type in self.calib_types:
-            self.calib_poses[calib_type] = rospy.get_param('/dyros_glove/calibration/' + calib_type)
+            self.calib_poses[calib_type] = rospy.get_param('/dyros_glove/calibration/{0}/{1}'.format(location,calib_type))
 
         # TODO: 
         # Use self.calib_poses['stretch'], : numpy.array(), len() = 4
