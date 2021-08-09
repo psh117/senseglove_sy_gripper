@@ -34,8 +34,8 @@ CURRENT_POSITION_CONTROL_MODE	= 5
 # Protocol version
 PROTOCOL_VERSION            = 2    
 
-DXL_ID_LEFT = [1,2,3,4]
-DXL_ID_RIGHT = [5,6,7,8]
+DXL_ID_LEFT = [11,12,13,14]
+DXL_ID_RIGHT = [1,2,3,4]
 
 BAUDRATE                    = 57600
 DEVICENAME_LEFT                   = "/dev/ttyUSB0".encode('utf-8')        # Check which port is being used on your controller
@@ -97,6 +97,24 @@ class HandInterface:
 
         self.set_glove_feedback(self.full_joint_names, [0] * 10)
         rospy.Subscriber("/tocabi/handforce_{0}".format(location), Float64MultiArray, self.callback1, queue_size=1)
+
+
+        #Preset dynamixel joint value of Gripper
+        # Thumb: Lateral Pinch, T-1, T-1	
+        # Thumb: Init, pinch, full flexion		
+        # Index: Init, pinch, full flexion	    
+        # Middle: Init, pinch, full flexion
+        if location is 'left':
+            self.ps = np.array([[1689, init_pos[0], 2700], 
+                        [init_pos[1], 1650 - init_pos[1] , 2400 - init_pos[1]], 
+                        [init_pos[2], 1800 - init_pos[2], 2400 - init_pos[2]], 
+                        [init_pos[3], 1800 - init_pos[3], 2400 - init_pos[3]]])
+
+        elif location is 'right':
+            self.ps = np.array([[3471, init_pos[0], 2460], 
+                        [init_pos[1], 1650 - init_pos[1] , 2400 - init_pos[1]], 
+                        [init_pos[2], 1800 - init_pos[2], 2400 - init_pos[2]], 
+                        [init_pos[3], 1800 - init_pos[3], 2400 - init_pos[3]]])
 
     def set_glove_feedback(self, names, vals):
         self.feedback_goal.trajectory.joint_names = names
@@ -163,19 +181,8 @@ class HandInterface:
 
         v1 = str_pos[0] + str_pos[1]
         #######################
-        
-        
-        
-        
-        
-        
-        #Preset dynamixel joint value of Gripper
-        ps = np.array([[1689, init_pos[0], 2700], [init_pos[1], 1650 - init_pos[1] , 2400 - init_pos[1]], [init_pos[2], 1800 - init_pos[2], 2400 - init_pos[2]], [init_pos[3], 1800 - init_pos[3], 2400 - init_pos[3]]])
-        # Thumb: Lateral Pinch, T-1, T-1	Thumb: Init, pinch, full flexion		Index: Init, pinch, full flexion	    Middle: Init, pinch, full flexion
 
-
-
-
+        ps = self.ps
         a0 = [0, 0, 0, 0]
 
         # a0 : full extension -> Using str_pos for all three fingers
