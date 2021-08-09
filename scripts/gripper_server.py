@@ -38,8 +38,10 @@ DXL_ID_LEFT = [11,12,13,14]
 DXL_ID_RIGHT = [1,2,3,4]
 
 BAUDRATE                    = 57600
-DEVICENAME_LEFT                   = "/dev/ttyUSB0".encode('utf-8')        # Check which port is being used on your controller
-DEVICENAME_RIGHT                  = "/dev/ttyUSB1".encode('utf-8')        # Check which port is being used on your controller
+# how to find ?
+# if the device name is correct, red, blue, and green led would light
+DEVICENAME_LEFT                   = "/dev/ttyUSB1".encode('utf-8')        # Check which port is being used on your controller
+DEVICENAME_RIGHT                  = "/dev/ttyUSB0".encode('utf-8')        # Check which port is being used on your controller
 
 device_names = {'left' : DEVICENAME_LEFT,
                 'right': DEVICENAME_RIGHT}
@@ -73,6 +75,22 @@ class HandInterface:
                             'thumb_finger2',
                             'lateral_pinch']
 
+        if location == 'left':
+            self.ps = np.array([[2460, init_pos[0],3471 ], 
+                        [init_pos[1], 1650 - init_pos[1] , 2400 - init_pos[1]], 
+                        [init_pos[2], 1800 - init_pos[2], 2400 - init_pos[2]], 
+                        [init_pos[3], 1800 - init_pos[3], 2400 - init_pos[3]]])
+            self. q = np.array([[0], [-891], [-1011]]) 
+
+        elif location == 'right':
+            self.ps = np.array([[2700, init_pos[0], 1689], 
+                        [init_pos[1], 1650 - init_pos[1] , 2400 - init_pos[1]], 
+                        [init_pos[2], 1800 - init_pos[2], 2400 - init_pos[2]], 
+                        [init_pos[3], 1800 - init_pos[3], 2400 - init_pos[3]]])
+            self. q = np.array([[0], [891], [1011]]) 
+
+        else: raise NameError('??{0}'.format(location))
+
         self.__calibration(location=location)
         self.__init_dxl(location=location)
         
@@ -104,17 +122,6 @@ class HandInterface:
         # Thumb: Init, pinch, full flexion		
         # Index: Init, pinch, full flexion	    
         # Middle: Init, pinch, full flexion
-        if location is 'left':
-            self.ps = np.array([[1689, init_pos[0], 2700], 
-                        [init_pos[1], 1650 - init_pos[1] , 2400 - init_pos[1]], 
-                        [init_pos[2], 1800 - init_pos[2], 2400 - init_pos[2]], 
-                        [init_pos[3], 1800 - init_pos[3], 2400 - init_pos[3]]])
-
-        elif location is 'right':
-            self.ps = np.array([[3471, init_pos[0], 2460], 
-                        [init_pos[1], 1650 - init_pos[1] , 2400 - init_pos[1]], 
-                        [init_pos[2], 1800 - init_pos[2], 2400 - init_pos[2]], 
-                        [init_pos[3], 1800 - init_pos[3], 2400 - init_pos[3]]])
 
     def set_glove_feedback(self, names, vals):
         self.feedback_goal.trajectory.joint_names = names
@@ -237,8 +244,8 @@ class HandInterface:
         f3[2] = ps[3,2] + (f3[1] / (a_max[3] + f3[0]))	# y_0
 
         #Thumb AA
-        q = np.array([[0], [891], [1011]]) 
-
+        #q = np.array([[0], [891], [1011]]) 
+        q =self.q
         M_AA = np.array([[a_thumbAA[0]*a_thumbAA[0], a_thumbAA[0], 1] , [a_thumbAA[1]*a_thumbAA[1], a_thumbAA[1], 1], [a_thumbAA[2]*a_thumbAA[2], a_thumbAA[2], 1]])
         M_AA_inv = np.linalg.inv(M_AA)
         f0 = np.dot(M_AA_inv, q)
@@ -271,7 +278,7 @@ class HandInterface:
         f3 = self.f3
         a0 = self.a0
 
-        desired_pos[0] = 1689 + int(f0[0,0]*q[0]*q[0] + f0[1,0]*q[0] + f0[2,0])
+        desired_pos[0] = self.ps[0, 2]  + int(f0[0,0]*q[0]*q[0] + f0[1,0]*q[0] + f0[2,0])
         desired_pos[1] = init_pos[1] + int( -f1[1]/((-q[1] - a0[1]) + f1[0]) + f1[2] )   #Minus data !!!
         desired_pos[2] = init_pos[2] + int( -f2[1]/((q[2] - a0[2]) + f2[0]) + f2[2] )
         desired_pos[3] = init_pos[3] + int( -f3[1]/((q[3] - a0[3]) + f3[0]) + f3[2] ) 
@@ -317,7 +324,7 @@ class HandInterface:
         # print('current pos ' , pos)
         
 if __name__== '__main__':
-    rospy.init_node('gripper_test', annonymous=True)
+    rospy.init_node('gripper_test', anonymous=True)
     location = rospy.get_param('~location', 'unset')
     hi = HandInterface(location)
     rospy.spin()
