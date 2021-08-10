@@ -37,7 +37,7 @@ PROTOCOL_VERSION            = 2
 DXL_ID = [1,2,3,4]
 
 BAUDRATE                    = 57600
-DEVICENAME                  = "/dev/ttyUSB0".encode('utf-8')        # Check which port is being used on your controller
+DEVICENAME                  = "/dev/ttyUSB2".encode('utf-8')        # Check which port is being used on your controller
                                                         # ex) Windows: "COM1"   Linux: "/dev/ttyUSB0"
 
 TORQUE_ENABLE               = 1                             # Value for enabling the torque
@@ -49,6 +49,13 @@ init_pos =[2580, 700, 700, 700]
 pos = [0,0,0,0]
 vel = [0,0,0,0]
 desired_pos = [0,0,0,0]
+
+        
+#Preset dynamixel joint value of Gripper
+ps = np.array([[1689, init_pos[0], 2700], [init_pos[1], 1650-init_pos[1] , 2400 - init_pos[1]], [init_pos[2], 1800 - init_pos[2], 2400 - init_pos[2]], [init_pos[3], 1800 - init_pos[3], 2400 - init_pos[3]]])
+# Thumb: Lateral Pinch, T-1, T-1	Thumb: Init, pinch, full flexion		Index: Init, pinch, full flexion	    Middle: Init, pinch, full flexion
+
+
 
 class HandInterface:
     def __init__(self):
@@ -153,11 +160,6 @@ class HandInterface:
         
         
         
-        
-        #Preset dynamixel joint value of Gripper
-        ps = np.array([[1689, init_pos[0], 2700], [init_pos[1], 1650 - init_pos[1] , 2400 - init_pos[1]], [init_pos[2], 1800 - init_pos[2], 2400 - init_pos[2]], [init_pos[3], 1800 - init_pos[3], 2400 - init_pos[3]]])
-        # Thumb: Lateral Pinch, T-1, T-1	Thumb: Init, pinch, full flexion		Index: Init, pinch, full flexion	    Middle: Init, pinch, full flexion
-
 
 
 
@@ -228,6 +230,12 @@ class HandInterface:
         self.f1 = f1
         self.f2 = f2
         self.f3 = f3
+
+        index_f_pinch_slope = (ps[2,2] - ps[2,1]) / (a[2] - a0[2]) *2.1
+        middle_f_pinch_slope = (ps[3,2] - ps[3,1]) / (a[3] - a0[3])*2.1
+        thumb_pinch_slope = (ps[1,2] - ps[1,1]) / (a[1] - a0[1]) * 1.3  #minus
+        self.pinch_slope = [0,thumb_pinch_slope,middle_f_pinch_slope,index_f_pinch_slope]
+
         #f0[0,0]
         #f0[0,1]
         #f0[0,2]
@@ -240,19 +248,36 @@ class HandInterface:
         self.current_glove_joint = np.array([input_pose[16], input_pose[18], input_pose[2], input_pose[6]])
         self.filtered_glove_joint = self.current_glove_joint * self.tau + self.past_glove_joints * (1 - self.tau)
 
-        #Thumb AA
-        q = self.filtered_glove_joint
-
         f0 = self.f0
         f1 = self.f1
         f2 = self.f2
         f3 = self.f3
         a0 = self.a0
 
-        desired_pos[0] = 1689 + int(f0[0,0]*q[0]*q[0] + f0[1,0]*q[0] + f0[2,0])
-        desired_pos[1] = init_pos[1] + int( -f1[1]/((-q[1] - a0[1]) + f1[0]) + f1[2] )   #Minus data !!!
-        desired_pos[2] = init_pos[2] + int( -f2[1]/((q[2] - a0[2]) + f2[0]) + f2[2] )
-        desired_pos[3] = init_pos[3] + int( -f3[1]/((q[3] - a0[3]) + f3[0]) + f3[2] ) 
+        q = self.filtered_glove_joint
+
+
+        pinch_slope = self.pinch_slope
+        threshold = 0.3
+        ring_f_mcp = input_pose[14]
+        little_f_mcp = input_pose[10]
+        # print(q[0])
+
+        if ring_f_mcp > threshold and little_f_mcp > threshold and self.current_dxl_joints[0] > 2500:         # pinch mode
+            desired_pos[0] = 2700           #abduction
+            desired_pos[1] = init_pos[1] + int(pinch_slope[1] * (-q[1] - a0[1]))       #minus
+            desired_pos[2] = init_pos[2] + int(pinch_slope[2] * (q[2] - a0[2]))
+            desired_pos[3] = init_pos[3] + int(pinch_slope[3] * (q[3] - a0[3]))
+            for i in range(1,4):
+                if desired_pos[i] > ps[i,0] + ps[i,1]:
+                    desired_pos[i] = ps[i,0] + ps[i,1]
+
+        else:
+        #Thumb AA
+            desired_pos[0] = 1689 + int(f0[0,0]*q[0]*q[0] + f0[1,0]*q[0] + f0[2,0])
+            desired_pos[1] = init_pos[1] + int( -f1[1]/((-q[1] - a0[1]) + f1[0]) + f1[2] )   #Minus data !!!
+            desired_pos[2] = init_pos[2] + int( -f2[1]/((q[2] - a0[2]) + f2[0]) + f2[2] )
+            desired_pos[3] = init_pos[3] + int( -f3[1]/((q[3] - a0[3]) + f3[0]) + f3[2] ) 
 
         if desired_pos[0] < 1000 :
             desired_pos[0] = 1689
@@ -262,7 +287,7 @@ class HandInterface:
                 desired_pos[i] = 600
 
         # print('desired_position', desired_pos)
-        #print('current_position', self.current_dxl_joints)
+        # print('current_position', self.current_dxl_joints)
 
         ###############################
 

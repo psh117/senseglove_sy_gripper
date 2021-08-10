@@ -40,8 +40,8 @@ DXL_ID_RIGHT = [1,2,3,4]
 BAUDRATE                    = 57600
 # how to find ?
 # if the device name is correct, red, blue, and green led would light
-DEVICENAME_LEFT                   = "/dev/ttyUSB1".encode('utf-8')        # Check which port is being used on your controller
-DEVICENAME_RIGHT                  = "/dev/ttyUSB0".encode('utf-8')        # Check which port is being used on your controller
+DEVICENAME_LEFT                   = "/dev/dxl_left".encode('utf-8')        # Check which port is being used on your controller
+DEVICENAME_RIGHT                  = "/dev/dxl_right".encode('utf-8')        # Check which port is being used on your controller
 
 device_names = {'left' : DEVICENAME_LEFT,
                 'right': DEVICENAME_RIGHT}
