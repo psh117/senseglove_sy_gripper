@@ -1,0 +1,8 @@
+<launch>
+
+  <node name="right_gripper" pkg="senseglove_sy_gripper" type="gripper_server.py"  output="screen">
+    <param name="location" type="str" value="right"/>
+    <param name="dev" type="str" value="/dev/ttyUSB0"/>
+  </node>
+
+</launch>

@@ -1,11 +1,13 @@
 <launch>
 
-  <node name="left_gripper" pkg="senseglove_sy_gripper" type="gripper_server.py">
+  <node name="left_gripper" pkg="senseglove_sy_gripper" type="gripper_server.py"  output="screen">
     <param name="location" type="str" value="left"/>
+    <param name="dev" type="str" value="/dev/dxl_left"/>
   </node>
   
-  <node name="right_gripper" pkg="senseglove_sy_gripper" type="gripper_server.py">
+  <node name="right_gripper" pkg="senseglove_sy_gripper" type="gripper_server.py"  output="screen">
     <param name="location" type="str" value="right"/>
+    <param name="dev" type="str" value="/dev/dxl_right"/>
   </node>
 
 </launch>

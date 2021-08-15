@@ -55,17 +55,15 @@ TORQUE_DISABLE              = 0                             # Value for disablin
 
 NUM_DXL				= 4
 
-init_pos =[2580, 700, 700, 700]
 pos = [0,0,0,0]
 vel = [0,0,0,0]
-desired_pos = [0,0,0,0]
 
 class HandInterface:
     def __init__(self, location, dev):
         if location != 'left' and location != 'right':
             raise NameError('location is wrong! location: {0}'.format(location))
         
-        self.past_glove_joints = np.zeros(4)
+        self.last_input = np.zeros(6)
         self.current_dxl_joints = np.zeros(4)
         self.calib_poses = {}
         self.calib_types = ['stretch',
@@ -76,18 +74,14 @@ class HandInterface:
                             'lateral_pinch']
 
         if location == 'left':
-            self.ps = np.array([[2460, init_pos[0],3471 ], 
-                        [init_pos[1], 1650 - init_pos[1] , 2400 - init_pos[1]], 
-                        [init_pos[2], 1800 - init_pos[2], 2400 - init_pos[2]], 
-                        [init_pos[3], 1800 - init_pos[3], 2400 - init_pos[3]]])
-            self. q = np.array([[0], [-891], [-1011]]) 
+            self.gripper_min = [2600, 700, 700, 700]
+            self.gripper_pinch = [2650, 1650, 1800, 1800]
+            self.gripper_max = [2700, 2400, 2400, 2400]
 
         elif location == 'right':
-            self.ps = np.array([[2700, init_pos[0], 1689], 
-                        [init_pos[1], 1400 - init_pos[1] , 2000 - init_pos[1]], 
-                        [init_pos[2], 1500 - init_pos[2], 2100 - init_pos[2]], 
-                        [init_pos[3], 1600 - init_pos[3], 2100 - init_pos[3]]])
-            self. q = np.array([[0], [891], [1011]]) 
+            self.gripper_min = [1689, 700, 700, 700]
+            self.gripper_pinch = [2650, 1400, 1600, 1600]
+            self.gripper_max = [2700, 2000, 2100, 2100]
 
         else: raise NameError('??{0}'.format(location))
 
@@ -178,132 +172,141 @@ class HandInterface:
         #     self.calib_poses['lateral_pinch'] : numpy.array(), len() = 4
 
         # example ############
-        str_pos = self.calib_poses['stretch']
-        f12_pos = self.calib_poses['finger1_finger2_flexion']
-        tfe_pos = self.calib_poses['thumb_flexion']
-        tf1_pos = self.calib_poses['thumb_finger1']
-        tf2_pos = self.calib_poses['thumb_finger2']
-        lap_pos = self.calib_poses['lateral_pinch'] 
+        stretch_pose = self.calib_poses['stretch']
+        im_flex_pose = self.calib_poses['finger1_finger2_flexion']
+        thumb_flex_pose = self.calib_poses['thumb_flexion']
+        ti_pinch_pose = self.calib_poses['thumb_finger1']
+        tm_pinch_pose = self.calib_poses['thumb_finger2']
+        lat_pinch_pose = self.calib_poses['lateral_pinch'] 
         
         #0:Thumb AA, 1:Thumb MCP, 2:Index MCP, 3:Middle MCP (16:Thumb AA, 18:Thumb MCP, 2:Index MCP, 6:Middle MCP)
 
-        v1 = str_pos[0] + str_pos[1]
         #######################
 
-        ps = self.ps
-        a0 = [0, 0, 0, 0]
+        glove_min = [0, 0, 0, 0]
+        glove_pinch = [0, 0, 0, 0]
+        glove_max = [0, 0, 0, 0]
+        glove_min = [0, 0, 0, 0]
 
-        # a0 : full extension -> Using str_pos for all three fingers
-        a0[1] = -str_pos[1]  # Minus!!!
-        a0[2] = str_pos[2]
-        a0[3] = str_pos[3]
+        # glove_min : full extension -> Using stretch_pose for all three fingers
+        glove_min[0] = lat_pinch_pose[0]
+        glove_min[1] = -stretch_pose[1]
+        glove_min[2] = stretch_pose[2]
+        glove_min[3] = stretch_pose[3]
 
         #Flexion Activation at pinch - Thumb Index Middle
-        a = [0, 0, 0, 0]			
-        a[0] = 0					#Not used
 
-        #Using tf1_pos, tf2_pos 
-        a[1] = -(tf1_pos[1]+tf2_pos[1])/2   # MINUS Value!!!! 
-        a[2] = tf1_pos[2]
-        a[3] = tf2_pos[3]
+        #Using ti_pinch_pose, tm_pinch_pose 
+        glove_pinch[0] = (ti_pinch_pose[0]+tm_pinch_pose[0])/2
+        glove_pinch[1] = -tm_pinch_pose[1]
+        glove_pinch[2] = ti_pinch_pose[2]
+        glove_pinch[3] = tm_pinch_pose[3]
 
+        glove_max[0] = tm_pinch_pose[0]
+        glove_max[1] = -thumb_flex_pose[1]
+        glove_max[2] = im_flex_pose[2]
+        glove_max[3] = im_flex_pose[3]
 
+        glove_AA = [lat_pinch_pose[0], ti_pinch_pose[0], tm_pinch_pose[0]]
+        #glove_AA = [0.22, 0.71, 0.76]  #AA activations of Lateral Pinch, T-1 and T-2
+        #glove_AA = [0.2, 0.6, 0.69]
 
-        a_max = [0, 0, 0, 0]
-        a_max[1] = -tfe_pos[1] - a0[1] # Minus!!!
-        a_max[2] = f12_pos[2] - a0[2]
-        a_max[3] = f12_pos[3] - a0[3]
+        self.glove_min = glove_min
+        self.glove_pinch = glove_pinch
+        self.glove_max = glove_max
 
-        a_thumbAA = [lap_pos[0], tf1_pos[0], tf2_pos[0]]
-        #a_thumbAA = [0.22, 0.71, 0.76]  #AA activations of Lateral Pinch, T-1 and T-2
-        #a_thumbAA = [0.2, 0.6, 0.69]
-
-        #Thumb FE
-        f1 = [0, 0, 0]
-        f1[0] = -(ps[1,2]-ps[1,1])/((ps[1,2]/a_max[1]) - (ps[1,1] / (a[1] - a0[1])))  	# x_0
-        f1[1] = (ps[1,2]/a_max[1]) * (f1[0] + a_max[1]) * f1[0]  	# k
-        f1[2] = ps[1,2] + (f1[1] / (a_max[1] + f1[0]))	# y_0
-
-
-        #Index FE
-        f2 = [0, 0, 0]
-        # F : Y= -k/(x + x_0) + y_0
-        # F : Y = -f2[1]/(data + f2[0]) + f2[2]
-        #f2[0] = -(ps[2,2]-ps[2,1])/((ps[2,2]/3) - ((ps[2,2]-ps[2,1]) / (a[2]-a0[2])))  	# x_0
-        #f2[1] = (ps[2,2]/3) * (f2[0] + 3) * f2[0]  	# k
-        #f2[2] = ps[2,2] + (f2[1] / (3 + f2[0]))	# y_0
-
-        f2[0] = -(ps[2,2]-ps[2,1])/((ps[2,2]/a_max[2]) - (ps[2,1] / (a[2]-a0[2])))  	# x_0
-        f2[1] = (ps[2,2]/a_max[2] ) * (f2[0] + a_max[2] ) * f2[0]  	# k
-        f2[2] = ps[2,2] + (f2[1] / (a_max[2]  + f2[0]))	# y_0
-
-
-        #Middle FE
-        f3 = [0, 0, 0]
-        f3[0] = -(ps[3,2]-ps[3,1])/((ps[3,2]/a_max[3]) - (ps[3,1] / (a[3] - a0[3])))  	# x_0
-        f3[1] = (ps[3,2]/a_max[3]) * (f3[0] + a_max[3]) * f3[0]  	# k
-        f3[2] = ps[3,2] + (f3[1] / (a_max[3] + f3[0]))	# y_0
-
-        #Thumb AA
-        #q = np.array([[0], [891], [1011]]) 
-        q =self.q
-        M_AA = np.array([[a_thumbAA[0]*a_thumbAA[0], a_thumbAA[0], 1] , [a_thumbAA[1]*a_thumbAA[1], a_thumbAA[1], 1], [a_thumbAA[2]*a_thumbAA[2], a_thumbAA[2], 1]])
-        M_AA_inv = np.linalg.inv(M_AA)
-        f0 = np.dot(M_AA_inv, q)
-
-        self.a0 = a0
-        self.a = a
-        self.a_max = a_max
-        self.f0 = f0
-        self.f1 = f1
-        self.f2 = f2
-        self.f3 = f3
-        #f0[0,0]
-        #f0[0,1]
-        #f0[0,2]
-        # F = f0[0,0]*x^2 + f0[0,1]*x + f0[0,2]
+        # print('glove_min', glove_min)
+        print('glove_pinch', glove_pinch)
+        # print('glove_max', glove_max)
 
     def callback(self, data):
         self.read_joint_position()
         input_pose = data.position
+
+        gripper_min = self.gripper_min
+        gripper_pinch = self.gripper_pinch
+        gripper_max = self.gripper_max
         
-        self.current_glove_joint = np.array([input_pose[16], input_pose[18], input_pose[2], input_pose[6]])
-        self.filtered_glove_joint = self.current_glove_joint * self.tau + self.past_glove_joints * (1 - self.tau)
+        self.new_input = np.array([input_pose[16], -input_pose[18], input_pose[2], input_pose[6], input_pose[10], input_pose[14]])
+        
+        glove_current = self.new_input * self.tau + self.last_input * (1 - self.tau)
+        #glove_current[1] = -glove_current[1] # Minus!
+        
+        # glove_current: 0 thumb aa / 1 thumb flex / 2 index flex / 3 middle flex / 4 ring flex / 5 pinky flex
+        
+        glove_min = self.glove_min
+        glove_pinch = self.glove_pinch
+        glove_max = self.glove_max
+        print(glove_pinch)
+        print(glove_max)
 
-        #Thumb AA
-        q = self.filtered_glove_joint
+        gripper_desired = [0, 0, 0, 0]
+        
+        # Pinch mode: 1DOF control of 3 fingers when middle, ring, pinky are fully flexed
+        #             flexion_rate = normalized index mcp of glove
+        
+        threshold = 0.5
+        
+        # if glove_current[3] > threshold and glove_current[4] > threshold and glove_current[5] > threshold:
+            
+        #     flexion_rate = (glove_current[2] - glove_min[2]) / (glove_max[2] - glove_min[2])
 
-        f0 = self.f0
-        f1 = self.f1
-        f2 = self.f2
-        f3 = self.f3
-        a0 = self.a0
+        #     for i in range(4):
+        #         gripper_desired[i] = gripper_min[i] + (gripper_max[i] - gripper_min[i]) * flexion_rate
 
-        desired_pos[0] = self.ps[0, 2]  + int(f0[0,0]*q[0]*q[0] + f0[1,0]*q[0] + f0[2,0])
-        desired_pos[1] = init_pos[1] + int( -f1[1]/((-q[1] - a0[1]) + f1[0]) + f1[2] )   #Minus data !!!
-        desired_pos[2] = init_pos[2] + int( -f2[1]/((q[2] - a0[2]) + f2[0]) + f2[2] )
-        desired_pos[3] = init_pos[3] + int( -f3[1]/((q[3] - a0[3]) + f3[0]) + f3[2] ) 
+        #     gripper_desired[0] = 2700
+        
+        
+        
+        # Normal mapping: Linear mapping except for pinching region
+        #                 gripper_desired = gripper_pinch when pinch_start <= glove < pinch_end
+        #else:
+        glove_pinch_start = [0, 0, 0, 0]
+        glove_pinch_end = [0, 0, 0, 0]
 
-        if desired_pos[0] < 1000 :
-            desired_pos[0] = 1689
+        glove_pinch_start[0] = glove_pinch[0] - 0.1
+        glove_pinch_end[0] = glove_pinch[0] + 0.1
 
-        for i in range(1,4) :
-            if desired_pos[i] < 600 :
-                desired_pos[i] = 600
+        glove_pinch_start[1] = glove_pinch[1] - 0.2
+        glove_pinch_end[1] = glove_pinch[1] + 0.05
+        
+        glove_pinch_start[2] = glove_pinch[2] - 0.2
+        glove_pinch_end[2] = glove_pinch[2] + 0.2
+        
+        glove_pinch_start[3] = glove_pinch[3] - 0.2
+        glove_pinch_end[3] = glove_pinch[3] + 0.2
+        
+        gripper_desired[0] = int(gripper_min[0] + (gripper_max[0] - gripper_min[0]) * (glove_current[0] - glove_min[0]) / (glove_max[0] - glove_min[0]))
 
-        # print('desired_position', desired_pos)
-        #print('current_position', self.current_dxl_joints)
+        for i in range(1,4):
+            if glove_current[i] < glove_pinch_start[i]:
+                gripper_desired[i] = int(gripper_min[i] + (gripper_pinch[i] - gripper_min[i]) * (glove_current[i] - glove_min[i]) / (glove_pinch_start[i] - glove_min[i]))
+            elif glove_current[i] < glove_pinch_end[i]:
+                gripper_desired[i] = int(gripper_pinch[i])
+            else:
+                gripper_desired[i] = int(gripper_max[i] + (gripper_pinch[i] - gripper_max[i]) * (glove_current[i] - glove_max[i]) / (glove_pinch_end[i] - glove_max[i]))
+
+        print(glove_current)
+        print(gripper_desired)
+
+        # Saturation
+
+        for i in range(4) :
+            if gripper_desired[i] < gripper_min[i]:
+                gripper_desired[i] = gripper_min[i]
+            elif gripper_desired[i] > gripper_max[i]:
+                gripper_desired[i] = gripper_max[i]
+
 
         ###############################
-
-
+       
         self.groupSyncWrite.clearParam()
         for i in range(4):
-            param_goal_position = [dxl.DXL_LOBYTE(dxl.DXL_LOWORD(desired_pos[i])), dxl.DXL_HIBYTE(dxl.DXL_LOWORD(desired_pos[i])), dxl.DXL_LOBYTE(dxl.DXL_HIWORD(desired_pos[i])), dxl.DXL_HIBYTE(dxl.DXL_HIWORD(desired_pos[i]))]
+            param_goal_position = [dxl.DXL_LOBYTE(dxl.DXL_LOWORD(gripper_desired[i])), dxl.DXL_HIBYTE(dxl.DXL_LOWORD(gripper_desired[i])), dxl.DXL_LOBYTE(dxl.DXL_HIWORD(gripper_desired[i])), dxl.DXL_HIBYTE(dxl.DXL_HIWORD(gripper_desired[i]))]
             self.groupSyncWrite.addParam(self.dxl_id[i], param_goal_position)
 
         dxl_comm_result = self.groupSyncWrite.txPacket()
-        self.past_glove_joints = self.filtered_glove_joint
+        self.last_input = glove_current
 
     def callback1(self, data):
         sensor_data = data.data
@@ -334,3 +337,4 @@ if __name__== '__main__':
     # shutdown
     for i in range(4):
         hi.packetHandler.write1ByteTxRx(hi.portHandler, hi.dxl_id[i], ADDR_XL330_TORQUE_ENABLE , TORQUE_DISABLE)
+        
