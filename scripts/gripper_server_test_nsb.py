@@ -74,13 +74,13 @@ class HandInterface:
                             'lateral_pinch']
 
         if location == 'left':
-            self.gripper_min = [2600, 700, 700, 700]
-            self.gripper_pinch = [2650, 1650, 1800, 1800]
-            self.gripper_max = [2700, 2400, 2400, 2400]
+            self.gripper_min = [3471, 700, 700, 700]
+            self.gripper_pinch = [2580, 1650, 1800, 1800]
+            self.gripper_max = [2460, 2400, 2400, 2400]
 
         elif location == 'right':
             self.gripper_min = [1689, 700, 700, 700]
-            self.gripper_pinch = [2650, 1400, 1600, 1600]
+            self.gripper_pinch = [2580, 1400, 1600, 1600]
             self.gripper_max = [2700, 2000, 2100, 2100]
 
         else: raise NameError('??{0}'.format(location))
@@ -186,8 +186,6 @@ class HandInterface:
         glove_min = [0, 0, 0, 0]
         glove_pinch = [0, 0, 0, 0]
         glove_max = [0, 0, 0, 0]
-        glove_min = [0, 0, 0, 0]
-
         # glove_min : full extension -> Using stretch_pose for all three fingers
         glove_min[0] = lat_pinch_pose[0]
         glove_min[1] = -stretch_pose[1]
@@ -207,7 +205,7 @@ class HandInterface:
         glove_max[2] = im_flex_pose[2]
         glove_max[3] = im_flex_pose[3]
 
-        glove_AA = [lat_pinch_pose[0], ti_pinch_pose[0], tm_pinch_pose[0]]
+        #glove_AA = [lat_pinch_pose[0], ti_pinch_pose[0], tm_pinch_pose[0]]
         #glove_AA = [0.22, 0.71, 0.76]  #AA activations of Lateral Pinch, T-1 and T-2
         #glove_AA = [0.2, 0.6, 0.69]
 
@@ -215,9 +213,9 @@ class HandInterface:
         self.glove_pinch = glove_pinch
         self.glove_max = glove_max
 
-        # print('glove_min', glove_min)
-        print('glove_pinch', glove_pinch)
-        # print('glove_max', glove_max)
+        #print('glove_min', glove_min)
+        #print('glove_pinch', glove_pinch)
+        #print('glove_max', glove_max)
 
     def callback(self, data):
         self.read_joint_position()
@@ -237,6 +235,7 @@ class HandInterface:
         glove_min = self.glove_min
         glove_pinch = self.glove_pinch
         glove_max = self.glove_max
+        print(glove_min)
         print(glove_pinch)
         print(glove_max)
 
@@ -245,7 +244,7 @@ class HandInterface:
         # Pinch mode: 1DOF control of 3 fingers when middle, ring, pinky are fully flexed
         #             flexion_rate = normalized index mcp of glove
         
-        threshold = 0.5
+        #threshold = 0.5
         
         # if glove_current[3] > threshold and glove_current[4] > threshold and glove_current[5] > threshold:
             
@@ -264,20 +263,30 @@ class HandInterface:
         glove_pinch_start = [0, 0, 0, 0]
         glove_pinch_end = [0, 0, 0, 0]
 
-        glove_pinch_start[0] = glove_pinch[0] - 0.1
-        glove_pinch_end[0] = glove_pinch[0] + 0.1
+        #glove_pinch_start[0] = glove_pinch[0] - 0.1  # Thumb AA pinch range is not required
+        #glove_pinch_end[0] = glove_pinch[0] + 0.1
 
-        glove_pinch_start[1] = glove_pinch[1] - 0.2
-        glove_pinch_end[1] = glove_pinch[1] + 0.05
+        # glove_pinch_start[1] = glove_pinch[1] - 0.2   glove_pinch_lower * (glove_pinch[i] - glove_min[i])
+        # glove_pinch_end[1] = glove_pinch[1] + 0.05
         
-        glove_pinch_start[2] = glove_pinch[2] - 0.2
-        glove_pinch_end[2] = glove_pinch[2] + 0.2
+        # glove_pinch_start[2] = glove_pinch[2] - 0.2
+        # glove_pinch_end[2] = glove_pinch[2] + 0.2
         
-        glove_pinch_start[3] = glove_pinch[3] - 0.2
-        glove_pinch_end[3] = glove_pinch[3] + 0.2
-        
+        # glove_pinch_start[3] = glove_pinch[3] - 0.2
+        # glove_pinch_end[3] = glove_pinch[3] + 0.2
+
+        glove_pinch_lower = 0.22
+        glove_pinch_upper = 0.15
+
+        for i in range(1,4):
+            glove_pinch_start[i] = glove_pinch[i] - glove_pinch_lower * (glove_pinch[i] - glove_min[i])
+            glove_pinch_end[i] = glove_pinch[i] + glove_pinch_upper * (glove_max[i] - glove_pinch[i])
+            
+        # Calculating Gripper desired pose
+        # Thumb AA joint : linear interpolation using min and Max data    
         gripper_desired[0] = int(gripper_min[0] + (gripper_max[0] - gripper_min[0]) * (glove_current[0] - glove_min[0]) / (glove_max[0] - glove_min[0]))
 
+        # Thumb  and Fingers flexion joints : 
         for i in range(1,4):
             if glove_current[i] < glove_pinch_start[i]:
                 gripper_desired[i] = int(gripper_min[i] + (gripper_pinch[i] - gripper_min[i]) * (glove_current[i] - glove_min[i]) / (glove_pinch_start[i] - glove_min[i]))
@@ -289,8 +298,7 @@ class HandInterface:
         print(glove_current)
         print(gripper_desired)
 
-        # Saturation
-
+        # Range of motion limit
         for i in range(4) :
             if gripper_desired[i] < gripper_min[i]:
                 gripper_desired[i] = gripper_min[i]
