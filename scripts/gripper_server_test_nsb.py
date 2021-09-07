@@ -67,20 +67,19 @@ class HandInterface:
         self.current_dxl_joints = np.zeros(4)
         self.calib_poses = {}
         self.calib_types = ['stretch',
-                            'finger1_finger2_flexion',
+                            'three_fingers_pinch',
                             'thumb_flexion',
-                            'thumb_finger1',
-                            'thumb_finger2',
+                            'finger1_finger2_flexion',
                             'lateral_pinch']
 
         if location == 'left':
             self.gripper_min = [3471, 700, 700, 700]
-            self.gripper_pinch = [2580, 1650, 1800, 1800]
-            self.gripper_max = [2460, 2400, 2400, 2400]
+            self.gripper_pinch = [2580, 1500, 1450, 1650]
+            self.gripper_max = [2700, 2400, 2400, 2400]
 
         elif location == 'right':
             self.gripper_min = [1689, 700, 700, 700]
-            self.gripper_pinch = [2580, 1400, 1600, 1600]
+            self.gripper_pinch = [2580, 1450, 1650, 1650]
             self.gripper_max = [2700, 2000, 2100, 2100]
 
         else: raise NameError('??{0}'.format(location))
@@ -175,8 +174,8 @@ class HandInterface:
         stretch_pose = self.calib_poses['stretch']
         im_flex_pose = self.calib_poses['finger1_finger2_flexion']
         thumb_flex_pose = self.calib_poses['thumb_flexion']
-        ti_pinch_pose = self.calib_poses['thumb_finger1']
-        tm_pinch_pose = self.calib_poses['thumb_finger2']
+        ti_pinch_pose = self.calib_poses['three_fingers_pinch']
+        tm_pinch_pose = self.calib_poses['three_fingers_pinch']
         lat_pinch_pose = self.calib_poses['lateral_pinch'] 
         
         #0:Thumb AA, 1:Thumb MCP, 2:Index MCP, 3:Middle MCP (16:Thumb AA, 18:Thumb MCP, 2:Index MCP, 6:Middle MCP)
@@ -235,9 +234,6 @@ class HandInterface:
         glove_min = self.glove_min
         glove_pinch = self.glove_pinch
         glove_max = self.glove_max
-        print(glove_min)
-        print(glove_pinch)
-        print(glove_max)
 
         gripper_desired = [0, 0, 0, 0]
         
@@ -295,17 +291,16 @@ class HandInterface:
             else:
                 gripper_desired[i] = int(gripper_max[i] + (gripper_pinch[i] - gripper_max[i]) * (glove_current[i] - glove_max[i]) / (glove_pinch_end[i] - glove_max[i]))
 
-        print(glove_current)
-        print(gripper_desired)
 
         # Range of motion limit
-        for i in range(4) :
+        for i in range(1,4) :
             if gripper_desired[i] < gripper_min[i]:
                 gripper_desired[i] = gripper_min[i]
             elif gripper_desired[i] > gripper_max[i]:
                 gripper_desired[i] = gripper_max[i]
 
 
+        
         ###############################
        
         self.groupSyncWrite.clearParam()
