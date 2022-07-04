@@ -4,7 +4,7 @@ import rospy
 import os, sys
 import copy
 import numpy as np
-# import keyboard
+import keyboard
 from functools import partial
 from sensor_msgs.msg import JointState
 
@@ -24,8 +24,7 @@ class GloveCalibration:
         self.calib_types = ['stretch',
                             'finger1_finger2_flexion',
                             'thumb_flexion',
-                            'thumb_finger1',
-                            'thumb_finger2',
+                            'three_fingers_pinch',
                             'lateral_pinch']
 
         rospy.Subscriber("/senseglove/0/lh/joint_states", JointState, partial(self.joint_callback,'left'), queue_size=1)
@@ -50,7 +49,7 @@ class GloveCalibration:
         for calib_type in self.calib_types:
             print ('calibrating... {0} - {1}'.format(location, calib_type))
             print('Press enter to start this calibration')
-            # a = input()
+            a = raw_input()
             os.system('pause')
 
             self.joint_captures[location] = []
@@ -79,4 +78,4 @@ if __name__== '__main__':
     rospy.init_node('glove_gripper_calibration')
     gc = GloveCalibration()
     gc.calibration('left')
-    gc.calibration('right')
+    #gc.calibration('right')
